@@ -1,8 +1,9 @@
 <?php
 if (!defined('QA_VERSION')) {
 	require_once dirname(empty($_SERVER['SCRIPT_FILENAME']) ? __FILE__ : $_SERVER['SCRIPT_FILENAME']).'/../../qa-include/qa-base.php';
-   require_once QA_INCLUDE_DIR.'app/emails.php';
 }
+require_once QA_INCLUDE_DIR.'app/emails.php';
+require_once QA_PLUGIN_DIR . 'q2a-stepmail-answer/q2a-stepmail-answer-db-client.php';
 
 class q2a_stepmail_answer_event
 {
@@ -11,9 +12,8 @@ class q2a_stepmail_answer_event
 		if ($event != 'a_post')
 			return;
 
-
 		$db_round = 0;
-		$posts = $this->getAnswerCount($userid);
+		$posts = q2a_stepmail_answer_db_client::getAnswerCount($userid);
 		foreach($posts as $post) {
 			$db_round = $post['round'];
 		}
@@ -21,13 +21,14 @@ class q2a_stepmail_answer_event
 		for($i=1; $i<=4; $i++){
 			$round = qa_opt('q2a-stepmail-answer-round-' . $i);
 			if ($round == $db_round) {
-				$user = $this->getUserInfo($userid);
+				$user = q2a_stepmail_answer_db_client::getUserInfo($userid);
 				$body = qa_opt('q2a-stepmail-answer-' . $i);
 				$title = qa_opt('q2a-stepmail-answer-title-' . $i);
 				$body = strtr($body,
 					array(
 						'^username' => $user['handle'],
-						'^sitename' => qa_opt('site_title')
+						'^sitename' => qa_opt('site_title'),
+						'^siteurl' => qa_opt('site_url'),
 					)
 				);
 				$this->sendEmail($title, $body, $user['handle'], $user['email']);
@@ -52,18 +53,4 @@ class q2a_stepmail_answer_event
 		$params['toemail'] = 'yuichi.shiga@gmail.com';
 		qa_send_email($params);
 	}
-
-	function getAnswerCount($userid)
-	{
-		$sql = "select count(postid) as round from qa_posts where userid=" . $userid . " and type='A'";
-		$result = qa_db_query_sub($sql);
-		return qa_db_read_all_assoc($result);
-	}
-
-        function getUserInfo($userid)
-        {
-                $sql = 'select email,handle from qa_users where userid=' . $userid;
-                $result = qa_db_query_sub($sql);
-                return qa_db_read_all_assoc($result);
-        }
 }
